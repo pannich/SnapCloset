@@ -1,0 +1,77 @@
+# ========================
+# Python-related ignores
+# ========================
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pkl
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.env
+.venv/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# Pytest
+.cache/
+.pytest_cache/
+
+# ========================
+# Node/Expo (React Native)
+# ========================
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Metro and bundler
+.expo/
+.expo-shared/
+.expo-cache/
+packager-cache-*
+*.expo
+
+# Environment files
+.env
+.env.*
+
+# Build output
+dist/
+web-build/
+android/
+ios/
+*.apk
+*.aab
+
+# Logs
+*.log
+
+# Mac and OS-specific
+.DS_Store
+Thumbs.db
+
+# ========================
+# General
+# ========================
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.tmp
+data/

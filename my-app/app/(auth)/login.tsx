@@ -1,3 +1,5 @@
+// Updated to use Supabase authentication
+
 import React, { useState } from 'react';
 import {
   View,
@@ -14,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { supabase } from '../../supabase/supabaseClient';
 
 export default function AuthScreen() {
   const [isSignIn, setIsSignIn] = useState(true);
@@ -24,6 +27,7 @@ export default function AuthScreen() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -49,31 +53,92 @@ export default function AuthScreen() {
     return true;
   };
 
-  const handleSubmit = () => {
-    if (validateForm()) {
-      // Here you would typically make an API call to authenticate/register
-      Alert.alert(
-        'Success!',
-        isSignIn ? 'Signed in successfully!' : 'Account created successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to main app
-              router.replace('/(tabs)');
-            },
-          },
-        ]
-      );
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      if (isSignIn) {
+        // Sign in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (error) {
+          Alert.alert('Sign In Error', error.message);
+        } else {
+          console.log('Signed in successfully:', data.user?.email);
+          // Navigation will be handled by the auth state change in _layout.tsx
+        }
+      } else {
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (error) {
+          Alert.alert('Sign Up Error', error.message);
+        } else {
+          Alert.alert(
+            'Account Created!',
+            'Please check your email to verify your account.',
+            [{ text: 'OK' }]
+          );
+          setIsSignIn(true); // Switch to sign in mode
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert(
-      'Forgot Password',
-      'Password reset link will be sent to your email',
-      [{ text: 'OK' }]
-    );
+  const handleForgotPassword = async () => {
+    if (!formData.email.trim()) {
+      Alert.alert('Error', 'Please enter your email address first');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: 'snapcloset://reset-password',
+      });
+
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert(
+          'Password Reset',
+          'Password reset link has been sent to your email',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Password reset error:', error);
+      Alert.alert('Error', 'Failed to send password reset email');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'snapcloset://auth-callback',
+        },
+      });
+
+      if (error) {
+        Alert.alert('Google Sign In Error', error.message);
+      }
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      Alert.alert('Error', 'Failed to sign in with Google');
+    }
   };
 
   return (
@@ -108,6 +173,7 @@ export default function AuthScreen() {
                   onChangeText={(text) => handleInputChange('email', text)}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!loading}
                 />
               </View>
 
@@ -120,10 +186,12 @@ export default function AuthScreen() {
                   value={formData.password}
                   onChangeText={(text) => handleInputChange('password', text)}
                   secureTextEntry={!showPassword}
+                  editable={!loading}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIcon}
+                  disabled={loading}
                 >
                   <Ionicons
                     name={showPassword ? 'eye' : 'eye-off'}
@@ -143,10 +211,12 @@ export default function AuthScreen() {
                     value={formData.confirmPassword}
                     onChangeText={(text) => handleInputChange('confirmPassword', text)}
                     secureTextEntry={!showConfirmPassword}
+                    editable={!loading}
                   />
                   <TouchableOpacity
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     style={styles.eyeIcon}
+                    disabled={loading}
                   >
                     <Ionicons
                       name={showConfirmPassword ? 'eye' : 'eye-off'}
@@ -157,14 +227,22 @@ export default function AuthScreen() {
                 </View>
               )}
 
-              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+              <TouchableOpacity
+                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
                 <Text style={styles.submitButtonText}>
-                  {isSignIn ? 'Sign In' : 'Create Account'}
+                  {loading ? 'Please Wait...' : (isSignIn ? 'Sign In' : 'Create Account')}
                 </Text>
               </TouchableOpacity>
 
               {isSignIn && (
-                <TouchableOpacity style={styles.forgotPasswordButton} onPress={handleForgotPassword}>
+                <TouchableOpacity
+                  style={styles.forgotPasswordButton}
+                  onPress={handleForgotPassword}
+                  disabled={loading}
+                >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
               )}
@@ -175,7 +253,11 @@ export default function AuthScreen() {
                 <View style={styles.dividerLine} />
               </View>
 
-              <TouchableOpacity style={styles.googleButton}>
+              <TouchableOpacity
+                style={styles.googleButton}
+                onPress={handleGoogleSignIn}
+                disabled={loading}
+              >
                 <Ionicons name="logo-google" size={20} color="#666" />
                 <Text style={styles.googleButtonText}>
                   Continue with Google
@@ -186,7 +268,10 @@ export default function AuthScreen() {
                 <Text style={styles.switchText}>
                   {isSignIn ? "Don't have an account? " : "Already have an account? "}
                 </Text>
-                <TouchableOpacity onPress={() => setIsSignIn(!isSignIn)}>
+                <TouchableOpacity
+                  onPress={() => setIsSignIn(!isSignIn)}
+                  disabled={loading}
+                >
                   <Text style={styles.switchLink}>
                     {isSignIn ? 'Sign Up' : 'Sign In'}
                   </Text>
@@ -285,6 +370,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   forgotPasswordButton: {
     alignItems: 'center',

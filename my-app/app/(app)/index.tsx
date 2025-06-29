@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,217 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { supabase } from '../../supabase/supabaseClient';
+import { decode } from 'base64-arraybuffer';
+// import { Fileobject } from '@supabase/storage-js';
+
+import { AuthProvider, useAuth } from '../../provider/AuthProvider';
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Mock userId for testing - in real app this would come from auth
+  const userId = '123e4567-e89b-12d3-a456-426614174000'; // Proper UUID format
+  console.log("******* User :", user);
+
+  useEffect(() => {
+    if (!user) {
+      console.warn('No user logged in, skipping fetchItems');
+      return;
+    }
+
+    async function fetchItems() {
+      const { data, error } = await supabase
+        .from('user_items')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching user_items:', error);
+        setError(error.message);
+      } else {
+        console.log('Fetched user_items:', data);
+        setItems(data || []);
+      }
+    }
+
+    fetchItems();
+  }, [user]);
+
+  // Function to add item image
+  const addItemImage = async () => {
+    try {
+      setUploading(true);
+
+      // 1. Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
+        return;
+      }
+
+      // 2. Open image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      const actualUserId = "01c5722d-5c5f-43ba-878a-0228c23e3747" // Replace with actual user ID from auth context
+
+      // 3. Upload to Supabase Storage
+      if (!result.canceled && result.assets[0]) {
+        const img = result.assets[0];
+        const base64 = await FileSystem.readAsStringAsync(img.uri, { encoding: 'base64' });
+        const filePath = `${user!.id}/${new Date().getTime()}.${img.type === 'image' ? 'png' : 'mp4'}`;
+        // const filePath = `${actualUserId}/${new Date().getTime()}.${img.type === 'image' ? 'png' : 'mp4'}`;
+
+        const contentType = img.type === 'image' ? 'image/png' : 'video/mp4';
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('user-images').upload(filePath, decode(base64), { contentType });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          Alert.alert('Upload Failed', 'Failed to upload image to storage');
+          return;
+        }
+
+        console.log('Upload successful:', uploadData);
+
+        // 5. Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-images')
+          .getPublicUrl(filePath);
+
+        console.log('Public URL:', publicUrl);
+
+        // 4. Insert into database
+        const { data: itemData, error: insertError } = await supabase
+          .from('user_items')
+          .insert([
+            {
+              user_id: user!.id,  // TODO : Auth here user!.id
+              item_name: 'New Item',
+              item_description: 'Item uploaded from mobile app',
+              item_image_url: publicUrl,
+            }
+          ])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Database insert error:', insertError);
+          Alert.alert('Database Error', 'Failed to save item to database');
+          return;
+        }
+
+        console.log('Item saved to database:', itemData);
+        Alert.alert('Success', 'Image uploaded and item saved successfully!');
+
+        // 7. Refresh items list
+        const { data: refreshedData } = await supabase
+          .from('user_items')
+          .select('*');
+        setItems(refreshedData || []);
+
+      } else {
+        console.log('Image picker cancelled');
+      }
+
+    } catch (error) {
+      console.error('Error in addItemImage:', error);
+      Alert.alert('Error', 'Something went wrong while uploading image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Test function to add mock data
+  const addMockData = async () => {
+    try {
+      // First, we need to create a user in user_authentication
+      const { data: userData, error: userError } = await supabase
+        .from('user_authentication')
+        .insert([
+          {
+            email: 'test@example.com',
+          }
+        ])
+        .select()
+        .single();
+
+      if (userError) {
+        console.error('Error creating user:', userError);
+        Alert.alert('Error', 'Failed to create test user');
+        return;
+      }
+
+      console.log('Created test user:', userData);
+
+      // Now add mock items
+      const mockItems = [
+        {
+          user_id: userData.user_id,
+          item_name: 'Blue Denim Jacket',
+          item_description: 'Classic blue denim jacket perfect for casual outings',
+          item_image_url: 'https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=400&h=400&fit=crop',
+        },
+        {
+          user_id: userData.user_id,
+          item_name: 'White Sneakers',
+          item_description: 'Comfortable white sneakers for everyday wear',
+          item_image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop',
+        },
+        {
+          user_id: userData.user_id,
+          item_name: 'Black T-Shirt',
+          item_description: 'Essential black t-shirt for any outfit',
+          item_image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
+        },
+        {
+          user_id: userData.user_id,
+          item_name: 'Khaki Pants',
+          item_description: 'Versatile khaki pants for business casual',
+          item_image_url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&h=400&fit=crop',
+        },
+      ];
+
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('user_items')
+        .insert(mockItems)
+        .select();
+
+      if (itemsError) {
+        console.error('Error adding mock items:', itemsError);
+        Alert.alert('Error', 'Failed to add mock items');
+        return;
+      }
+
+      console.log('Added mock items:', itemsData);
+      Alert.alert('Success', `Added ${itemsData.length} mock items!`);
+
+      // Refresh the items list
+      const { data: refreshedData } = await supabase
+        .from('user_items')
+        .select('*');
+      setItems(refreshedData || []);
+
+    } catch (error) {
+      console.error('Error in addMockData:', error);
+      Alert.alert('Error', 'Something went wrong');
+    }
+  };
+
   const recentOutfits = [
     {
       id: 1,
@@ -70,6 +275,34 @@ export default function HomeScreen() {
             <Ionicons name="notifications" size={24} color="#1e293b" />
           </TouchableOpacity>
         </View>
+
+        {/* Test Button for Mock Data */}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={addMockData}
+        >
+          <Text style={styles.testButtonText}>🧪 Add Test Data</Text>
+        </TouchableOpacity>
+
+        {/* Add Item Image Button */}
+        <TouchableOpacity
+          style={[styles.testButton, uploading && styles.testButtonDisabled]}
+          onPress={addItemImage}
+          disabled={uploading}
+        >
+          <Text style={styles.testButtonText}>
+            {uploading ? '📤 Uploading...' : '📷 Add Item Image'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Display Items Count */}
+        {items.length > 0 && (
+          <View style={styles.itemsCount}>
+            <Text style={styles.itemsCountText}>
+              📦 {items.length} items in database
+            </Text>
+          </View>
+        )}
 
         {/* Camera Section */}
         <TouchableOpacity
@@ -186,6 +419,32 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     padding: 5,
+  },
+  testButton: {
+    padding: 10,
+    backgroundColor: '#667eea',
+    borderRadius: 8,
+    marginBottom: 20,
+    marginHorizontal: 20,
+  },
+  testButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+  },
+  testButtonDisabled: {
+    backgroundColor: '#cbd5e1',
+  },
+  itemsCount: {
+    padding: 10,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  itemsCountText: {
+    fontSize: 14,
+    color: '#64748b',
   },
   cameraSection: {
     marginHorizontal: 20,

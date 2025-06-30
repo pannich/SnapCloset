@@ -198,3 +198,70 @@ def get_styling_advice(request: StylingRequest, bg: BackgroundTasks):
 
     
     
+from fastapi import WebSocket, WebSocketDisconnect
+from uuid import uuid4
+
+@router.websocket("/ws/styling")
+async def websocket_styling(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        data = await websocket.receive_json()
+        season = data.get("season", "summer")
+        selected_indices = data.get("selected_images_indices", [0])
+
+        # Load base64 images as before
+        images_dir = Path(RAW_IMAGES_DIR)
+        base64_dir = Path(RAW_BASE64_IMAGES_DIR)
+        image_files = list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.png"))
+        selected_images = [image_files[i] for i in selected_indices if i < len(image_files)]
+        b64_list = []
+        for img in selected_images:
+            txt = base64_dir / (img.stem + ".txt")
+            if not txt.exists():
+                b64_txt = base64.b64encode(img.read_bytes()).decode()
+                txt.write_text(b64_txt)
+            else:
+                b64_txt = txt.read_text()
+            b64_list.append(b64_txt)
+
+        # Generate image for each style
+        styles = ["casual", "edgy", "preppy", "cute"]
+        for style in styles:
+            prompt = (
+                f"Provide a stylish {season} outfit with a {style} vibe. "
+                "The lighting is soft and natural. Flat lay photography style. "
+                "Must include all items from the provided image(s)."
+            )
+            content = [{"type": "input_text", "text": prompt}]
+            content += [
+                {"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}"}
+                for b64 in b64_list
+            ]
+
+            try:
+                response = client.responses.create(
+                    model="gpt-4o",
+                    input=[{"type": "message", "role": "user", "content": content}],
+                    tools=[{"type": "image_generation"}],
+                    temperature=0.7,
+                )
+
+                # Extract image
+                for block in response.output:
+                    if block.type == "image_generation_call":
+                        img_data = base64.b64decode(block.result)
+                        filename = f"{style}_{uuid4()}.png"
+                        path = Path(GENERATED_IMAGES_DIR) / filename
+                        path.write_bytes(img_data)
+
+                        # Send to frontend
+                        await websocket.send_json({
+                            "style": style,
+                            "image_url": f"/static/generated/{filename}"  # adjust as needed
+                        })
+
+            except Exception as e:
+                await websocket.send_json({"style": style, "error": str(e)})
+
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")

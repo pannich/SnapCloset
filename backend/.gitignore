@@ -19,7 +19,8 @@ ENV/
 .cache/
 .pytest_cache/
 
-*/.DS_Store
+.DS_Store
+**/.DS_Store
 Thumbs.db
 .idea/
 *.iml

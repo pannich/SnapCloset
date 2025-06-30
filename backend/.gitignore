@@ -9,7 +9,7 @@ __pycache__/
 dist/
 build/
 
-.env
+.env*
 .venv/
 venv/
 ENV/
@@ -19,7 +19,7 @@ ENV/
 .cache/
 .pytest_cache/
 
-.DS_Store
+*/.DS_Store
 Thumbs.db
 .idea/
 *.iml
@@ -27,3 +27,5 @@ Thumbs.db
 *.sublime-project
 *.swp
 *.tmp
+
+data/

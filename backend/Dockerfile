@@ -21,7 +21,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Optional: install your project in editable mode
-COPY app ./app
+# COPY app ./app
 ENV PYTHONPATH=/project
 
 # Optional: expose both FastAPI and Jupyter ports
@@ -31,4 +31,4 @@ EXPOSE 8000
 # COPY .env .
 
 # Default command runs FastAPI
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

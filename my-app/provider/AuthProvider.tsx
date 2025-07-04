@@ -1,3 +1,17 @@
+// AuthProvider.tsx
+//
+// AuthProvider
+//  → defines value = { user, session, initialized, signOut }
+//  → wraps your app with <AuthContext.Provider value={value}>
+
+// AuthContext
+//  → is the storage for that value
+
+// useAuth()
+//  → is a helper to read that value from AuthContext
+//  → returns { user, session, initialized, signOut }
+//
+
 import React, { useState, useEffect, createContext, PropsWithChildren } from 'react';
 import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '../supabase/supabaseClient';
@@ -46,5 +60,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     signOut,
   };
 
+  // Wrap the children with the AuthContext.Provider
+  // now when we call useAuth() in any child component, it will return { user, session, initialized, signOut }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

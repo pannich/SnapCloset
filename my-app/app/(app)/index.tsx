@@ -17,7 +17,7 @@ import { supabase } from '../../supabase/supabaseClient';
 import { decode } from 'base64-arraybuffer';
 // import { Fileobject } from '@supabase/storage-js';
 
-import { AuthProvider, useAuth } from '../../provider/AuthProvider';
+import { useAuth } from '../../provider/AuthProvider';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -26,8 +26,7 @@ export default function HomeScreen() {
   const [uploading, setUploading] = useState(false);
 
   // Mock userId for testing - in real app this would come from auth
-  const userId = '123e4567-e89b-12d3-a456-426614174000'; // Proper UUID format
-  console.log("******* User :", user);
+  console.log("******* User :", user?.email, user?.id);
 
   useEffect(() => {
     if (!user) {
@@ -44,7 +43,7 @@ export default function HomeScreen() {
         console.error('Error fetching user_items:', error);
         setError(error.message);
       } else {
-        console.log('Fetched user_items:', data);
+        // console.log('Fetched user_items:', data);
         setItems(data || []);
       }
     }
@@ -79,7 +78,6 @@ export default function HomeScreen() {
         const img = result.assets[0];
         const base64 = await FileSystem.readAsStringAsync(img.uri, { encoding: 'base64' });
         const filePath = `${user!.id}/${new Date().getTime()}.${img.type === 'image' ? 'png' : 'mp4'}`;
-        // const filePath = `${actualUserId}/${new Date().getTime()}.${img.type === 'image' ? 'png' : 'mp4'}`;
 
         const contentType = img.type === 'image' ? 'image/png' : 'video/mp4';
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -91,7 +89,7 @@ export default function HomeScreen() {
           return;
         }
 
-        console.log('Upload successful:', uploadData);
+        console.log('Upload to bucket successful:', uploadData);
 
         // 5. Get public URL
         const { data: { publicUrl } } = supabase.storage
@@ -144,47 +142,35 @@ export default function HomeScreen() {
   // Test function to add mock data
   const addMockData = async () => {
     try {
-      // First, we need to create a user in user_authentication
-      const { data: userData, error: userError } = await supabase
-        .from('user_authentication')
-        .insert([
-          {
-            email: 'test@example.com',
-          }
-        ])
-        .select()
-        .single();
-
-      if (userError) {
-        console.error('Error creating user:', userError);
-        Alert.alert('Error', 'Failed to create test user');
+      if (!user || !user.id) {
+        Alert.alert('Authentication Error', 'Please log in to add test data');
         return;
       }
 
-      console.log('Created test user:', userData);
+      console.log('Adding mock data for user:', user.id);
 
       // Now add mock items
       const mockItems = [
         {
-          user_id: userData.user_id,
+          user_id: user.id,
           item_name: 'Blue Denim Jacket',
           item_description: 'Classic blue denim jacket perfect for casual outings',
           item_image_url: 'https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=400&h=400&fit=crop',
         },
         {
-          user_id: userData.user_id,
+          user_id: user.id,
           item_name: 'White Sneakers',
           item_description: 'Comfortable white sneakers for everyday wear',
           item_image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop',
         },
         {
-          user_id: userData.user_id,
+          user_id: user.id,
           item_name: 'Black T-Shirt',
           item_description: 'Essential black t-shirt for any outfit',
           item_image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
         },
         {
-          user_id: userData.user_id,
+          user_id: user.id,
           item_name: 'Khaki Pants',
           item_description: 'Versatile khaki pants for business casual',
           item_image_url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&h=400&fit=crop',
@@ -208,7 +194,8 @@ export default function HomeScreen() {
       // Refresh the items list
       const { data: refreshedData } = await supabase
         .from('user_items')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
       setItems(refreshedData || []);
 
     } catch (error) {

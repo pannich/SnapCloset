@@ -48,3 +48,19 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+
+## Supabase set up
+
+Typical command flow for no-Docker setup:
+
+# 1️⃣ Make sure your migrations folder is correct
+ls supabase/migrations/
+
+# 2️⃣ Connect to Supabase
+supabase login
+supabase link --project-ref your-project-ref
+
+# 3️⃣ Push to remote
+supabase db push

@@ -8,9 +8,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../supabase/supabaseClient'; // Adjust the import path as necessary
 
 export default function CollectionsScreen() {
   const [activeTab, setActiveTab] = useState('outfits');
+  const [stylingAdvice, setStylingAdvice] = useState<string | null>("Tap the button to get styling advice!");
 
   const savedOutfits = [
     {
@@ -128,6 +130,28 @@ export default function CollectionsScreen() {
       ))}
     </View>
   );
+  
+ const getStylingAdvice = async () => {
+  try {
+    const { data, error } = await supabase.functions.invoke('get-styling-advice', {
+      body: {
+        season: "summer",
+        styles: "casual",
+      },
+    });
+
+    if (error) {
+      console.error("Function error:", error);
+      setStylingAdvice("Error: " + error.message);
+    } else {
+      const content = data?.choices?.[0]?.message?.content;
+      setStylingAdvice(content || "No advice returned.");
+    }
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    setStylingAdvice("Something went wrong. Try again.");
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,28 +163,61 @@ export default function CollectionsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'outfits' && styles.activeTab]}
-          onPress={() => setActiveTab('outfits')}
-        >
-          <Text style={[styles.tabText, activeTab === 'outfits' && styles.activeTabText]}>
-            Outfits ({savedOutfits.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'items' && styles.activeTab]}
-          onPress={() => setActiveTab('items')}
-        >
-          <Text style={[styles.tabText, activeTab === 'items' && styles.activeTabText]}>
-            Items ({savedItems.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* All content below should scroll */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ 
+          flexGrow: 1,
+          paddingBottom: 40
+        }}
+      >
+        {/* Styling Advice Button */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 10 }}>
+          <TouchableOpacity
+            onPress={getStylingAdvice}
+            style={{
+              backgroundColor: '#667eea',
+              paddingVertical: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+              Get Styling Advice
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Content */}
-      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Display Styling Advice */}
+        {stylingAdvice && (
+          <View style={styles.adviceBox}>
+            <Text numberOfLines={10} ellipsizeMode="tail" style={styles.adviceText}>
+              {stylingAdvice}
+            </Text>
+          </View>
+        )}
+
+        {/* Tabs */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'outfits' && styles.activeTab]}
+            onPress={() => setActiveTab('outfits')}
+          >
+            <Text style={[styles.tabText, activeTab === 'outfits' && styles.activeTabText]}>
+              Outfits ({savedOutfits.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'items' && styles.activeTab]}
+            onPress={() => setActiveTab('items')}
+          >
+            <Text style={[styles.tabText, activeTab === 'items' && styles.activeTabText]}>
+              Items ({savedItems.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Tab Content */}
         {activeTab === 'outfits' ? renderOutfits() : renderItems()}
       </ScrollView>
     </SafeAreaView>
@@ -346,5 +403,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     marginLeft: 4,
+  },
+  adviceBox: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  adviceText: {
+    fontSize: 16,
+    color: '#1e293b',
+    lineHeight: 22,
   },
 });

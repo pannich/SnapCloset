@@ -46,3 +46,6 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# data
+/data/

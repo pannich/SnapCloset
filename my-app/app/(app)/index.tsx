@@ -271,6 +271,31 @@ export default function HomeScreen() {
           <Text style={styles.testButtonText}>🧪 Add Test Data</Text>
         </TouchableOpacity>
 
+        {/* Debug Auth Button */}
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={async () => {
+            try {
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              console.log('Current auth user:', authUser);
+
+              // Test a simple query
+              const { data, error } = await supabase
+                .from('user_items')
+                .select('count')
+                .limit(1);
+
+              console.log('Test query result:', { data, error });
+              Alert.alert('Debug Info', `User: ${authUser?.id}\nQuery Error: ${error?.message || 'None'}`);
+            } catch (err) {
+              console.error('Debug error:', err);
+              Alert.alert('Debug Error', String(err));
+            }
+          }}
+        >
+          <Text style={styles.testButtonText}>🔍 Debug Auth</Text>
+        </TouchableOpacity>
+
         {/* Add Item Image Button */}
         <TouchableOpacity
           style={[styles.testButton, uploading && styles.testButtonDisabled]}

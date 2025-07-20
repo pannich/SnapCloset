@@ -1,0 +1,5 @@
+# supabase temp folder
+/supabase/
+
+# mac
+.DS_Store

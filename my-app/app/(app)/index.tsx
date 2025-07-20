@@ -15,6 +15,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { supabase } from '../../supabase/supabaseClient';
 import { decode } from 'base64-arraybuffer';
+import { Image } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 // import { Fileobject } from '@supabase/storage-js';
 
 import { useAuth } from '../../provider/AuthProvider';
@@ -24,6 +26,8 @@ export default function HomeScreen() {
   const [items, setItems] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showDeleteMode, setShowDeleteMode] = useState(false);
+  const [addBtnPressed, setAddBtnPressed] = useState(false);
 
   // Mock userId for testing - in real app this would come from auth
   console.log("******* User :", user?.email, user?.id);
@@ -71,7 +75,6 @@ export default function HomeScreen() {
         quality: 0.8,
       });
 
-      const actualUserId = "01c5722d-5c5f-43ba-878a-0228c23e3747" // Replace with actual user ID from auth context
 
       // 3. Upload to Supabase Storage
       if (!result.canceled && result.assets[0]) {
@@ -139,7 +142,27 @@ export default function HomeScreen() {
     }
   };
 
-  // Test function to add mock data
+  // Function to delete an item by id
+  const deleteItem = async (itemId: number) => {
+    console.log('Attempting to delete item with item_id:', itemId);
+    try {
+      const { error } = await supabase
+        .from('user_items')
+        .delete()
+        .eq('item_id', itemId);
+      if (error) {
+        console.error('Delete error:', error);
+        Alert.alert('Delete Error', 'Failed to delete item');
+        return;
+      }
+      setItems((prev) => prev.filter((item) => item.item_id !== itemId));
+    } catch (err) {
+      console.error('Dekete Exception', err);
+      Alert.alert('Delete Error', 'Something went wrong');
+    }
+  };
+
+  // TODO : DELETE Test function to add mock data
   const addMockData = async () => {
     try {
       if (!user || !user.id) {
@@ -263,34 +286,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Test Button for Mock Data */}
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={addMockData}
-        >
-          <Text style={styles.testButtonText}>🧪 Add Test Data</Text>
-        </TouchableOpacity>
-
-        {/* Add Item Image Button */}
-        <TouchableOpacity
-          style={[styles.testButton, uploading && styles.testButtonDisabled]}
-          onPress={addItemImage}
-          disabled={uploading}
-        >
-          <Text style={styles.testButtonText}>
-            {uploading ? '📤 Uploading...' : '📷 Add Item Image'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Display Items Count */}
-        {items.length > 0 && (
-          <View style={styles.itemsCount}>
-            <Text style={styles.itemsCountText}>
-              📦 {items.length} items in database
-            </Text>
-          </View>
-        )}
-
         {/* Camera Section */}
         <TouchableOpacity
           style={styles.cameraSection}
@@ -318,13 +313,7 @@ export default function HomeScreen() {
             <View style={[styles.actionIcon, { backgroundColor: '#667eea' }]}>
               <Ionicons name="add" size={24} color="white" />
             </View>
-            <Text style={styles.actionText}>New Outfit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={[styles.actionIcon, { backgroundColor: '#764ba2' }]}>
-              <Ionicons name="search" size={24} color="white" />
-            </View>
-            <Text style={styles.actionText}>Find Style</Text>
+            <Text style={styles.actionText}>Add Item</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <View style={[styles.actionIcon, { backgroundColor: '#f093fb' }]}>
@@ -334,10 +323,111 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Outfits */}
+
+        {/* Display Items Count */}
+        {items.length > 0 && (
+          <View style={styles.itemsCount}>
+            <Text style={styles.itemsCountText}>
+              📦 {items.length} items in database
+            </Text>
+          </View>
+        )}
+
+        {/* Display Items Images */}
+        <View style={[styles.section, { position: 'relative', minHeight: 100 }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Items</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20, overflow: 'visible' }}>
+            {/* + Add Item Card */}
+            <TouchableOpacity
+              onPress={addItemImage}
+              onPressIn={() => setAddBtnPressed(true)}
+              onPressOut={() => setAddBtnPressed(false)}
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 16,
+                width: 60,
+                height: 60,
+                borderRadius: 12,
+                backgroundColor: '#e0e7ff',
+                borderWidth: 2,
+                borderColor: addBtnPressed ? '#667eea' : '#d1d5db',
+                opacity: uploading ? 0.6 : 1,
+              }}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color="#667eea" />
+              ) : (
+                <Ionicons name="add" size={32} color={addBtnPressed ? '#667eea' : '#a3a3a3'} />
+              )}
+            </TouchableOpacity>
+
+            {/* Item cards */}
+            {[...items].reverse().map((item) => (
+              <View key={item.item_id} style={{ alignItems: 'center', marginRight: 16 }}>
+                <View style={{ position: 'relative', overflow: 'visible' }}>
+                  <TouchableOpacity
+                    onLongPress={() => setShowDeleteMode(true)}
+                    delayLongPress={500} // ms, optional
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: item.item_image_url }}
+                      style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#f1f5f9' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                  {showDeleteMode && (
+                    <TouchableOpacity
+                      onPress={() => deleteItem(item.item_id)}
+                      style={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        backgroundColor: '#ef4444',
+                        borderRadius: 10,
+                        width: 20,
+                        height: 20,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 20,
+                      }}
+                    >
+                      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>×</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {showDeleteMode && (
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 10,
+                }}
+                activeOpacity={1}
+                onPress={() => setShowDeleteMode(false)}
+              />
+            )}
+          </ScrollView>
+        </View>
+
+
+        {/* Your Catalogue */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Outfits</Text>
+            <Text style={styles.sectionTitle}>Your Catalogue</Text>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -361,22 +451,6 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Style Tips */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Style Tips</Text>
-          {styleTips.map((tip) => (
-            <TouchableOpacity key={tip.id} style={styles.tipCard}>
-              <View style={[styles.tipIcon, { backgroundColor: '#667eea' }]}>
-                <Ionicons name={tip.icon as any} size={20} color="white" />
-              </View>
-              <View style={styles.tipContent}>
-                <Text style={styles.tipTitle}>{tip.title}</Text>
-                <Text style={styles.tipDescription}>{tip.description}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-            </TouchableOpacity>
-          ))}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

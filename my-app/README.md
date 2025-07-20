@@ -64,3 +64,5 @@ supabase link --project-ref your-project-ref
 
 # 3️⃣ Push to remote
 supabase db push
+
+

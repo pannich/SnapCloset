@@ -136,7 +136,7 @@ export default function CollectionsScreen() {
     const { data, error } = await supabase.functions.invoke('get-styling-advice', {
       body: {
         season: "summer",
-        styles: "casual",
+        styles: "sexy",
       },
     });
 
@@ -145,7 +145,9 @@ export default function CollectionsScreen() {
       setStylingAdvice("Error: " + error.message);
     } else {
       const content = data?.choices?.[0]?.message?.content;
-      setStylingAdvice(content || "No advice returned.");
+      const responseTime = data?.responseTime;
+      const displayText = `Response Time: ${responseTime} ms\nAdvice: ${content || "No advice returned."}`;
+      setStylingAdvice(displayText);
     }
   } catch (err) {
     console.error("Unexpected error:", err);
@@ -191,9 +193,11 @@ export default function CollectionsScreen() {
         {/* Display Styling Advice */}
         {stylingAdvice && (
           <View style={styles.adviceBox}>
-            <Text numberOfLines={10} ellipsizeMode="tail" style={styles.adviceText}>
-              {stylingAdvice}
-            </Text>
+            <ScrollView style={styles.scrollableAdvice}>
+                <Text numberOfLines={10} ellipsizeMode="tail" style={styles.adviceText}>
+                  {stylingAdvice}
+                </Text> 
+            </ScrollView>
           </View>
         )}
 
@@ -404,6 +408,9 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginLeft: 4,
   },
+  scrollableAdvice: {
+    maxHeight: 200, // or whatever fits your layout
+},
   adviceBox: {
     backgroundColor: '#fff',
     marginHorizontal: 20,

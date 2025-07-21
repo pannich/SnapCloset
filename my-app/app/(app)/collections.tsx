@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,54 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabase/supabaseClient'; // Adjust the import path as necessary
+import { useAuth } from '../../provider/AuthProvider';
+import { Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
+type Item = {
+  user_id: string;
+  item_name: string;
+  item_description: string;
+  item_image_url: string;
+};
 
 export default function CollectionsScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('outfits');
+  const [items, setItems] = useState<Item[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [stylingAdvice, setStylingAdvice] = useState<string | null>("Tap the button to get styling advice!");
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+
+      const fetchItems = async () => {
+        const { data, error } = await supabase
+          .from('user_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching items:', error);
+          setError(error.message);
+        } else {
+          const newItems = data || [];
+          setItems(newItems);
+          // Clear selectedItem if it no longer exists
+          const exists = selectedItem && newItems.some(item => item.item_image_url === selectedItem.item_image_url);
+          if (!exists) {
+            setSelectedItem(newItems.length > 0 ? newItems[0] : null);
+          }
+        }
+      };
+
+      fetchItems();
+    }, [user])
+  );
 
   const savedOutfits = [
     {
@@ -173,6 +217,42 @@ export default function CollectionsScreen() {
           paddingBottom: 40
         }}
       >
+        
+        {/* Selected Item Bar */}
+        <View style={styles.selectedBar}>
+          {selectedItem ? (
+            <Image source={{ uri: selectedItem.item_image_url }} style={styles.preview} />
+          ) : (
+            <View style={[styles.preview, styles.placeholder]}>
+              {/* Optional placeholder icon or text */}
+            </View>
+          )}
+        </View>
+
+        {/* Wardrobe Items Section */}
+        <View style={[styles.section, { position: 'relative', minHeight: 100 }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Wardrobe Items</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10, overflow: 'visible' }}>
+            {/* Item cards */}
+            {[...items].reverse().map((item) => (
+              <View key={item.item_image_url} style={{ alignItems: 'center', marginRight: 16 }}>
+                <View style={{ position: 'relative', overflow: 'visible' }}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => setSelectedItem(item)}>
+                    <Image
+                      source={{ uri: item.item_image_url }}
+                      style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#f1f5f9' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Styling Advice Button */}
         <View style={{ paddingHorizontal: 20, marginBottom: 10 }}>
           <TouchableOpacity
@@ -245,6 +325,39 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#1e293b',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  selectedBar: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  preview: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    resizeMode: 'cover',
+    backgroundColor: '#f1f5f9',
+  },
+  placeholder: {
+    borderWidth: 2,
+    borderColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sortButton: {
     padding: 5,

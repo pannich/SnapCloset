@@ -1,7 +1,6 @@
 // supabase/functions/get-styling-advice/index.ts
 import { serve } from "https://deno.land/std/http/server.ts";
 
-// Replace with your own OpenAI API key
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 serve(async (req) => {

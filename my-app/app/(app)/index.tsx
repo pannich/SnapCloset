@@ -20,6 +20,7 @@ import { ActivityIndicator } from 'react-native';
 // import { Fileobject } from '@supabase/storage-js';
 
 import { useAuth } from '../../provider/AuthProvider';
+import ItemsDisplay from '../../components/ItemsDisplay';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const [uploading, setUploading] = useState(false);
   const [showDeleteMode, setShowDeleteMode] = useState(false);
   const [addBtnPressed, setAddBtnPressed] = useState(false);
+  const [showAllItems, setShowAllItems] = useState(false);
 
   // Mock userId for testing - in real app this would come from auth
   console.log("******* User :", user?.email, user?.id);
@@ -337,90 +339,24 @@ export default function HomeScreen() {
         <View style={[styles.section, { position: 'relative', minHeight: 100 }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Items</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
+            <TouchableOpacity onPress={() => setShowAllItems(!showAllItems)}>
+              <Text style={styles.seeAllText}>{showAllItems ? 'Show Less' : 'See All'}</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20, overflow: 'visible' }}>
-            {/* + Add Item Card */}
-            <TouchableOpacity
-              onPress={addItemImage}
-              onPressIn={() => setAddBtnPressed(true)}
-              onPressOut={() => setAddBtnPressed(false)}
-              style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-                width: 60,
-                height: 60,
-                borderRadius: 12,
-                backgroundColor: '#e0e7ff',
-                borderWidth: 2,
-                borderColor: addBtnPressed ? '#667eea' : '#d1d5db',
-                opacity: uploading ? 0.6 : 1,
-              }}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color="#667eea" />
-              ) : (
-                <Ionicons name="add" size={32} color={addBtnPressed ? '#667eea' : '#a3a3a3'} />
-              )}
-            </TouchableOpacity>
-
-            {/* Item cards */}
-            {[...items].reverse().map((item) => (
-              <View key={item.item_id} style={{ alignItems: 'center', marginRight: 16 }}>
-                <View style={{ position: 'relative', overflow: 'visible' }}>
-                  <TouchableOpacity
-                    onLongPress={() => setShowDeleteMode(true)}
-                    delayLongPress={500} // ms, optional
-                    activeOpacity={0.8}
-                  >
-                    <Image
-                      source={{ uri: item.item_image_url }}
-                      style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#f1f5f9' }}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                  {showDeleteMode && (
-                    <TouchableOpacity
-                      onPress={() => deleteItem(item.item_id)}
-                      style={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -8,
-                        backgroundColor: '#ef4444',
-                        borderRadius: 10,
-                        width: 20,
-                        height: 20,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 20,
-                      }}
-                    >
-                      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>×</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ))}
-
-            {showDeleteMode && (
-              <TouchableOpacity
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 10,
-                }}
-                activeOpacity={1}
-                onPress={() => setShowDeleteMode(false)}
-              />
-            )}
-          </ScrollView>
+          <ItemsDisplay
+            items={items}
+            showAllItems={showAllItems}
+            showDeleteMode={showDeleteMode}
+            uploading={uploading}
+            addBtnPressed={addBtnPressed}
+            onAddItem={addItemImage}
+            onAddBtnPressIn={() => setAddBtnPressed(true)}
+            onAddBtnPressOut={() => setAddBtnPressed(false)}
+            onLongPress={() => setShowDeleteMode(true)}
+            onDelete={deleteItem}
+            onToggleDeleteMode={() => setShowDeleteMode(false)}
+          />
         </View>
 
 

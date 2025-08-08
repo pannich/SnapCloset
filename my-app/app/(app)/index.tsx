@@ -15,9 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { supabase } from '../../supabase/supabaseClient';
 import { decode } from 'base64-arraybuffer';
-import { Image } from 'react-native';
 import { ActivityIndicator } from 'react-native';
-// import { Fileobject } from '@supabase/storage-js';
 
 import { useAuth } from '../../provider/AuthProvider';
 import ItemsDisplay from '../../components/ItemsDisplay';
@@ -25,7 +23,6 @@ import ItemsDisplay from '../../components/ItemsDisplay';
 export default function HomeScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showDeleteMode, setShowDeleteMode] = useState(false);
   const [addBtnPressed, setAddBtnPressed] = useState(false);
@@ -47,7 +44,6 @@ export default function HomeScreen() {
 
       if (error) {
         console.error('Error fetching user_items:', error);
-        setError(error.message);
       } else {
         // console.log('Fetched user_items:', data);
         setItems(data || []);
@@ -159,73 +155,8 @@ export default function HomeScreen() {
       }
       setItems((prev) => prev.filter((item) => item.item_id !== itemId));
     } catch (err) {
-      console.error('Dekete Exception', err);
+      console.error('Delete Exception', err);
       Alert.alert('Delete Error', 'Something went wrong');
-    }
-  };
-
-  // TODO : DELETE Test function to add mock data
-  const addMockData = async () => {
-    try {
-      if (!user || !user.id) {
-        Alert.alert('Authentication Error', 'Please log in to add test data');
-        return;
-      }
-
-      console.log('Adding mock data for user:', user.id);
-
-      // Now add mock items
-      const mockItems = [
-        {
-          user_id: user.id,
-          item_name: 'Blue Denim Jacket',
-          item_description: 'Classic blue denim jacket perfect for casual outings',
-          item_image_url: 'https://images.unsplash.com/photo-1544022613-e87ca75a784a?w=400&h=400&fit=crop',
-        },
-        {
-          user_id: user.id,
-          item_name: 'White Sneakers',
-          item_description: 'Comfortable white sneakers for everyday wear',
-          item_image_url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop',
-        },
-        {
-          user_id: user.id,
-          item_name: 'Black T-Shirt',
-          item_description: 'Essential black t-shirt for any outfit',
-          item_image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
-        },
-        {
-          user_id: user.id,
-          item_name: 'Khaki Pants',
-          item_description: 'Versatile khaki pants for business casual',
-          item_image_url: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&h=400&fit=crop',
-        },
-      ];
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('user_items')
-        .insert(mockItems)
-        .select();
-
-      if (itemsError) {
-        console.error('Error adding mock items:', itemsError);
-        Alert.alert('Error', 'Failed to add mock items');
-        return;
-      }
-
-      console.log('Added mock items:', itemsData);
-      Alert.alert('Success', `Added ${itemsData.length} mock items!`);
-
-      // Refresh the items list
-      const { data: refreshedData } = await supabase
-        .from('user_items')
-        .select('*')
-        .eq('user_id', user.id);
-      setItems(refreshedData || []);
-
-    } catch (error) {
-      console.error('Error in addMockData:', error);
-      Alert.alert('Error', 'Something went wrong');
     }
   };
 
@@ -250,27 +181,6 @@ export default function HomeScreen() {
       date: '2 days ago',
       rating: 4.9,
       image: '🌞',
-    },
-  ];
-
-  const styleTips = [
-    {
-      id: 1,
-      title: 'Color Coordination',
-      description: 'Learn how to match colors perfectly',
-      icon: 'color-palette',
-    },
-    {
-      id: 2,
-      title: 'Body Type Styling',
-      description: 'Dress for your body shape',
-      icon: 'body',
-    },
-    {
-      id: 3,
-      title: 'Seasonal Trends',
-      description: 'Stay updated with latest trends',
-      icon: 'trending-up',
     },
   ];
 
@@ -417,22 +327,6 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: 5,
   },
-  testButton: {
-    padding: 10,
-    backgroundColor: '#667eea',
-    borderRadius: 8,
-    marginBottom: 20,
-    marginHorizontal: 20,
-  },
-  testButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-  },
-  testButtonDisabled: {
-    backgroundColor: '#cbd5e1',
-  },
   itemsCount: {
     padding: 10,
     backgroundColor: 'white',
@@ -566,43 +460,6 @@ const styles = StyleSheet.create({
   },
   outfitDate: {
     fontSize: 10,
-    color: '#64748b',
-  },
-  tipCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tipIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  tipContent: {
-    flex: 1,
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  tipDescription: {
-    fontSize: 14,
     color: '#64748b',
   },
 });

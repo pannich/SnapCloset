@@ -1,5 +1,3 @@
-// Updated to use Supabase authentication
-
 import React, { useState } from 'react';
 import {
   View,
@@ -69,7 +67,6 @@ export default function AuthScreen() {
           Alert.alert('Sign In Error', error.message);
         } else {
           console.log('Signed in successfully:', data.user?.email);
-          // Navigation will be handled by the auth state change in _layout.tsx
         }
       } else {
         // Sign up

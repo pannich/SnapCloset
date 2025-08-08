@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,154 +6,91 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../supabase/supabaseClient'; // Adjust the import path as necessary
+import { useAuth } from '../../provider/AuthProvider';
+import { Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+
+type Item = {
+  user_id: string;
+  item_name: string;
+  item_description: string;
+  item_image_url: string;
+};
 
 export default function CollectionsScreen() {
-  const [activeTab, setActiveTab] = useState('outfits');
+  const { user } = useAuth();
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [items, setItems] = useState<Item[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [stylingAdvice, setStylingAdvice] = useState<string | null>("Tap the button to get styling advice!");
+  const [stylingImage, setStylingImage] = useState<string | null>(null);
 
-  const savedOutfits = [
-    {
-      id: 1,
-      name: 'Summer Casual',
-      date: '2024-01-15',
-      rating: 4.8,
-      category: 'Casual',
-      image: '👕',
-    },
-    {
-      id: 2,
-      name: 'Office Professional',
-      date: '2024-01-14',
-      rating: 4.6,
-      category: 'Formal',
-      image: '💼',
-    },
-    {
-      id: 3,
-      name: 'Weekend Vibes',
-      date: '2024-01-13',
-      rating: 4.9,
-      category: 'Casual',
-      image: '🌞',
-    },
-    {
-      id: 4,
-      name: 'Evening Glam',
-      date: '2024-01-12',
-      rating: 4.7,
-      category: 'Formal',
-      image: '✨',
-    },
-  ];
 
-  const savedItems = [
-    {
-      id: 1,
-      title: 'White T-Shirt Styling Guide',
-      author: 'StyleGuru',
-      likes: 1247,
-      type: 'article',
-    },
-    {
-      id: 2,
-      title: 'Color Coordination Tips',
-      author: 'Fashionista',
-      likes: 892,
-      type: 'guide',
-    },
-    {
-      id: 3,
-      title: 'Minimalist Wardrobe Essentials',
-      author: 'TrendSetter',
-      likes: 1563,
-      type: 'article',
-    },
-  ];
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
 
-  const renderOutfits = () => (
-    <View style={styles.content}>
-      {savedOutfits.map((outfit) => (
-        <TouchableOpacity key={outfit.id} style={styles.outfitCard}>
-          <View style={styles.outfitImage}>
-            <Text style={styles.outfitEmoji}>{outfit.image}</Text>
-          </View>
-          <View style={styles.outfitInfo}>
-            <Text style={styles.outfitName}>{outfit.name}</Text>
-            <Text style={styles.outfitCategory}>{outfit.category}</Text>
-            <View style={styles.outfitMeta}>
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={14} color="#ffd700" />
-                <Text style={styles.ratingText}>{outfit.rating}</Text>
-              </View>
-              <Text style={styles.outfitDate}>{outfit.date}</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      ))}
-    </View>
+      const fetchItems = async () => {
+        const { data, error } = await supabase
+          .from('user_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching items:', error);
+          setError(error.message);
+        } else {
+          const newItems = data || [];
+          setItems(newItems);
+          // Clear selectedItem if it no longer exists
+          const exists = selectedItem && newItems.some(item => item.item_image_url === selectedItem.item_image_url);
+          if (!exists) {
+            setSelectedItem(newItems.length > 0 ? newItems[0] : null);
+          }
+        }
+      };
+
+      fetchItems();
+    }, [user])
   );
 
-  const renderItems = () => (
-    <View style={styles.content}>
-      {savedItems.map((item) => (
-        <TouchableOpacity key={item.id} style={styles.itemCard}>
-          <View style={styles.itemHeader}>
-            <View style={styles.itemType}>
-              <Ionicons
-                name={item.type === 'article' ? 'document-text' : 'book'}
-                size={16}
-                color="#667eea"
-              />
-              <Text style={styles.itemTypeText}>
-                {item.type === 'article' ? 'Article' : 'Guide'}
-              </Text>
-            </View>
-            <TouchableOpacity>
-              <Ionicons name="heart" size={20} color="#ef4444" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.itemTitle}>{item.title}</Text>
-          <Text style={styles.itemAuthor}>by {item.author}</Text>
-          <View style={styles.itemStats}>
-            <View style={styles.likesContainer}>
-              <Ionicons name="heart" size={14} color="#ef4444" />
-              <Text style={styles.likesText}>{item.likes}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-  
- const getStylingAdvice = async () => {
-  try {
-    const { data, error } = await supabase.functions.invoke('get-styling-advice', {
-      body: {
-        season: "summer",
-        styles: "sexy",
-      },
-    });
+  const getStylingImage = async () => {
+    try {
+      setIsLoadingImage(true);
+      const { data, error } = await supabase.functions.invoke('get-styling-image', {
+        body: {
+          season: "summer",
+          style: "chic",
+          selected_image_url: selectedItem?.item_image_url, // send current item image
+        },
+      });
 
-    if (error) {
-      console.error("Function error:", error);
-      setStylingAdvice("Error: " + error.message);
-    } else {
-      const content = data?.choices?.[0]?.message?.content;
-      const responseTime = data?.responseTime;
-      const displayText = `Response Time: ${responseTime} ms\nAdvice: ${content || "No advice returned."}`;
-      setStylingAdvice(displayText);
+      if (error) {
+        console.error("Function error:", error);
+        setStylingAdvice("Error: " + error.message);
+      } else {
+        // ✅ Match OpenAI function response schema
+        const advice = data?.text_instructions ?? "No styling instructions provided.";
+        const image = data?.base64_images?.[0] ?? null;
+
+        setStylingAdvice(advice);
+        setStylingImage(image);
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setStylingAdvice("Something went wrong. Try again.");
+    } finally {
+      setIsLoadingImage(false);
     }
-  } catch (err) {
-    console.error("Unexpected error:", err);
-    setStylingAdvice("Something went wrong. Try again.");
-  }
-};
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -173,10 +110,46 @@ export default function CollectionsScreen() {
           paddingBottom: 40
         }}
       >
+        
+        {/* Selected Item Bar */}
+        <View style={styles.selectedBar}>
+          {selectedItem ? (
+            <Image source={{ uri: selectedItem.item_image_url }} style={styles.preview} />
+          ) : (
+            <View style={[styles.preview, styles.placeholder]}>
+              {/* Optional placeholder icon or text */}
+            </View>
+          )}
+        </View>
+
+        {/* Wardrobe Items Section */}
+        <View style={[styles.section, { position: 'relative', minHeight: 100 }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Wardrobe Items</Text>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10, overflow: 'visible' }}>
+            {/* Item cards */}
+            {[...items].reverse().map((item) => (
+              <View key={item.item_image_url} style={{ alignItems: 'center', marginRight: 16 }}>
+                <View style={{ position: 'relative', overflow: 'visible' }}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => setSelectedItem(item)}>
+                    <Image
+                      source={{ uri: item.item_image_url }}
+                      style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#f1f5f9' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Styling Advice Button */}
         <View style={{ paddingHorizontal: 20, marginBottom: 10 }}>
           <TouchableOpacity
-            onPress={getStylingAdvice}
+            onPress={getStylingImage}
             style={{
               backgroundColor: '#667eea',
               paddingVertical: 12,
@@ -200,29 +173,73 @@ export default function CollectionsScreen() {
             </ScrollView>
           </View>
         )}
+        {stylingImage && (
+          <View style={{ alignItems: 'center', marginTop: 16 }}>
+            {isLoadingImage ? (
+              <ActivityIndicator size="large" color="#667eea" />
+            ) : stylingImage ? (
+              <>
+                <Image
+                  source={{ uri: `data:image/png;base64,${stylingImage}` }}
+                  style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: '#f1f5f9' }}
+                  resizeMode="cover"
+                />
+                <Text style={{ marginTop: 8, color: '#64748b' }}>Generated Outfit Preview</Text>
+              </>
+            ) : (
+              <View
+                style={{
+                  width: 200,
+                  height: 200,
+                  borderRadius: 12,
+                  backgroundColor: '#f1f5f9',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#cbd5e1',
+                }}
+              >
+                <Text style={{ textAlign: 'center', color: '#94a3b8', paddingHorizontal: 12 }}>
+                  Your styling image will appear here once it’s generated.
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'outfits' && styles.activeTab]}
-            onPress={() => setActiveTab('outfits')}
-          >
-            <Text style={[styles.tabText, activeTab === 'outfits' && styles.activeTabText]}>
-              Outfits ({savedOutfits.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'items' && styles.activeTab]}
-            onPress={() => setActiveTab('items')}
-          >
-            <Text style={[styles.tabText, activeTab === 'items' && styles.activeTabText]}>
-              Items ({savedItems.length})
-            </Text>
-          </TouchableOpacity>
+        )}
+
+        <View style={{ alignItems: 'center', marginTop: 16 }}>
+          {stylingImage ? (
+            <>
+              <Image
+                source={{ uri: stylingImage }}
+                style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: '#f1f5f9' }}
+                resizeMode="cover"
+              />
+              <Text style={{ marginTop: 8, color: '#64748b' }}>Generated Outfit Preview</Text>
+            </>
+          ) : (
+            <View
+              style={{
+                width: 200,
+                height: 200,
+                borderRadius: 12,
+                backgroundColor: '#f1f5f9',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#cbd5e1',
+              }}
+            >
+              <Text style={{ textAlign: 'center', color: '#94a3b8', paddingHorizontal: 12 }}>
+                Your styling image will appear here once it’s generated.
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Tab Content */}
-        {activeTab === 'outfits' ? renderOutfits() : renderItems()}
+
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -245,6 +262,39 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#1e293b',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  selectedBar: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  preview: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    resizeMode: 'cover',
+    backgroundColor: '#f1f5f9',
+  },
+  placeholder: {
+    borderWidth: 2,
+    borderColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sortButton: {
     padding: 5,

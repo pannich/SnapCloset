@@ -1,56 +1,156 @@
-// supabase/functions/get-styling-advice/index.ts
 import { serve } from "https://deno.land/std/http/server.ts";
 
-// Replace with your own OpenAI API key
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 serve(async (req) => {
   try {
-    const body = await req.json();
-    const { season, styles } = body;
+    const { season, style, selected_image_url } = await req.json();
 
-    if (!season || !styles || typeof season !== "string" || typeof styles !== "string") {
-      return new Response("Missing or invalid 'season' or 'styles'", { status: 400 });
+    console.log("Step 1: Received request with season:", season, "style:", style, "and image URL:", selected_image_url);
+    // validate inputs
+    if (!season || !selected_image_url) {
+      return new Response(JSON.stringify({ error: "Missing required fields: season or selected_image_url" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (!selected_image_url.startsWith("http")) {
+      return new Response(JSON.stringify({ error: "Invalid image URL format" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const prompt = `Generate flat lay outfit ideas with a ${styles} vibe for ${season}. Use all provided items if any. Lighting should be soft and natural.`;
+    console.log("Step 2: Inputs validated successfully");
+    // fetch image and convert to base64
+    const imageResponse = await fetch(selected_image_url);
+    if (!imageResponse.ok) {
+      return new Response(JSON.stringify({ error: "Failed to fetch image from URL" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64InputImage = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    console.log("Step 3: Image successfully converted to base64");
 
-    // start timing
-    const startTime = Date.now();
+    // define the response structure
+    const outfitStylingResponseSchema = {
+      type: "object",
+      description: "Response schema for the outfit styling function.",
+      properties: {
+        text_instructions: {
+          type: "string",
+          description: "Text instructions for the outfit styling.",
+        },
+        base64_images: {
+          type: "array",
+          items: {
+            type: "string",
+            description: "Base64 encoded image of the styled outfit.",
+          },
+        },
+      },
+      required: ["text_instructions", "base64_images"],
+      additionalProperties: false,
+    };
 
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    // construct the request to OpenAI
+    const prompt = `Provide a stylish ${season} outfit with a ${style} vibe. The lighting is soft and natural. Flat lay photography style. Must include all items from the provided image. Along with the image, include an editorial-style styling note — a concise, thoughtfully written paragraph that captures the mood of the look, key pieces, and how one might recreate or wear the outfit with confidence and flair.`;
+
+    const input = [{
+      type: "message",
+      role: "user",
+      content: [
+        { type: "input_text", text: prompt },
+        {
+          type: "input_image",
+          image_url: `data:image/jpeg;base64,${base64InputImage}`,
+        },
+      ],
+    }];
+
+    console.log("Step 4: Calling OpenAI...");
+    const openaiRes = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "gpt-4o",
-        max_tokens: 500,
+        input,
+        tools: [{ type: "image_generation" }],
         temperature: 0.7,
-        messages: [
-          { role: "system", content: "You are a helpful fashion stylist." },
-          { role: "user", content: prompt },
-        ],
+        text: {
+          format: { 
+            type: "json_schema", 
+            "strict": true, 
+            "name": "OutfitStylingResponse",
+            "schema": outfitStylingResponseSchema
+          }
+        }
       }),
     });
 
-    // end timing
-    const endTime = Date.now();
-    const duration = endTime - startTime; // duration in milliseconds
-
     if (!openaiRes.ok) {
-      const errorDetails = await openaiRes.text();
-      return new Response(`OpenAI API error: ${errorDetails}`, { status: 500 });
+      const errorText = await openaiRes.text();
+      console.error("OpenAI API error:", errorText);
+      return new Response(JSON.stringify({ error: "OpenAI API request failed", details: errorText }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const openaiData = await openaiRes.json();
-    openaiData.responseTime = duration; // add response time to the data
+    console.log("Step 5: OpenAI response received successfully");
 
-    return new Response(JSON.stringify(openaiData), {
-      headers: { "Content-Type": "application/json" },
+    // Parse the OpenAI response
+    const responseJson = await openaiRes.json();
+    const outputs = responseJson.output || [];
+    if (!outputs || outputs.length === 0) {
+      return new Response(JSON.stringify({ error: "No outputs received from OpenAI" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    console.log("Step 6: OpenAI outputs parsed successfully");
+
+    // Extract image results
+    const base64_images = outputs
+      .filter((item) => item.type === "image_generation_call" && item.result)
+      .map((item) => item.result);
+    if (base64_images.length === 0) {
+      return new Response(JSON.stringify({ error: "No images generated by OpenAI" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    console.log("Step 7: Base64 images extracted successfully");
+
+    // Extract text instructions (assuming it's in a separate text output)
+    const textItem = outputs.find((item) => item.type === "text" && item.result);
+    const text_instructions = textItem?.result ?? "Styling instructions not provided.";
+    console.log("Step 8: Text instructions extracted successfully");
+
+    // Log responseJson.output, textItem, and base64_images before returning
+    console.log("Final response structure:", {
+      text_instructions,
+      base64_images,
     });
-  } catch (err) {
-    return new Response(`Error: ${err.message}`, { status: 500 });
+
+    return new Response(
+      JSON.stringify({ text_instructions, base64_images }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+  } catch (e) {
+    console.error("Unhandled exception in response:", e);
+    return new Response(
+      JSON.stringify({ error: "Unexpected server error", detail: e.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 });
